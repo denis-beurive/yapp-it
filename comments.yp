@@ -1,0 +1,104 @@
+# This parser accepts lines that look like:
+#
+#      bla bla bla
+#      bla # bla bla
+#      bla # bla bla
+#      ### bla bla
+#      # bla bla
+#      # bla # bla #
+#      bla bla bla ###
+
+### -------------------------------------------------
+### Tockens declarations.
+### -------------------------------------------------
+
+%strict
+
+
+
+%whites                = /([ \t]+)/
+%token BOL             = /(^|\r?\n)/
+%token COMMENT_TAG     = /(#+)/
+%token WORD            = /([^\s#]+)/
+
+
+### -------------------------------------------------
+### Code that will be copied into the parser.
+### -------------------------------------------------
+
+%{
+	my @comments = ();
+	my @buffer   = ();
+	my $state    = 'starting'; # Can be "comment_line" or "other".
+	
+	sub getComments { return @comments; }
+	
+	sub resetBuffer { @buffer = (); }
+	
+	sub resetParser { @comments = (); }
+	
+	sub setStateCommentLine {
+		$state = 'comment_line';
+		resetBuffer();
+	}
+	
+	sub setStateOther {
+		$state = 'other';
+		resetBuffer();
+	}
+	
+	sub keepComment
+	{
+		if ($state eq 'comment_line') { my @v = @buffer; push(@comments, \@v); }
+	}
+%}
+
+### -------------------------------------------------
+### Declare the first rule.
+### -------------------------------------------------
+
+%start doc
+
+%%
+
+doc: line
+   | doc line
+   ;
+
+line: comment_line    { keepComment(); }
+    | comment_line '' { keepComment(); }
+    | other           { keepComment(); }
+    | other ''        { keepComment(); }
+    | empty_line      { keepComment(); }
+    | empty_line ''   { keepComment(); }
+    ;
+
+comment_line: BOL COMMENT_TAG              { setStateCommentLine();
+                                             # print "Start a comment line\n";
+                                             push(@buffer, $_[3]);
+                                           }
+            | comment_line COMMENT_TAG     { push(@buffer, $_[2]);
+                                             # print "comment -> $_[2]\n";
+                                           }
+            | comment_line WORD            { push(@buffer, $_[2]);
+                                             # print "word -> $_[2]\n";
+                                           }
+            ;
+
+other: BOL WORD             { setStateOther();
+                            }
+     | other COMMENT_TAG    { 
+                            }
+     | other WORD           { 
+                            }
+     ;
+
+
+empty_line: BOL { setStateOther();
+                  # print "Got an empty line\n";
+                }
+          ;
+
+
+
+%%

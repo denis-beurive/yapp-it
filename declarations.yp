@@ -1,0 +1,70 @@
+# This parser accepts lines that look like:
+#      varname = { name1 name2
+#                  name3
+#      }
+#      or:
+#      varname =
+#      { name1 name2
+#        name3 }
+
+### -------------------------------------------------
+### Tockens declarations.
+### -------------------------------------------------
+
+%strict
+
+# Note: the regexp notation \s matches any whitespace character (space, tab, newline).
+#       therefore, "newlines" are treated as spaces.
+
+%whites           = /(\s+)/
+%token NAME       = /([a-zA-Z0-9]+)/
+
+### -------------------------------------------------
+### Code that will be copied into the parser.
+### -------------------------------------------------
+
+%{
+	my @declarations = ();
+	my %statement    = ('var' => undef, 'declaration' => []);
+	
+	sub resetParser {
+		@declarations = ();
+		resetStatement();
+	}
+	
+	sub resetStatement {
+		%statement = ('var' => undef, 'declaration' => []);
+	}
+	
+	sub getDeclarations {
+		return @declarations;
+	}
+
+%}
+
+### -------------------------------------------------
+### Declare the first rule.
+### -------------------------------------------------
+
+%start doc
+
+%%
+
+doc: declaration      { my %s = %statement; push(@declarations, \%s);
+                        resetStatement();
+                      }
+   | doc declaration  { my %s = %statement; push(@declarations, \%s);
+					    resetStatement();
+					  }
+   ; 
+
+
+declaration: NAME '=' '{' list '}' { $statement{'var'} = $_[1]; }
+           ;
+
+list:
+      NAME                 { push(@{$statement{'declaration'}}, $_[1]); }
+    | list NAME            { push(@{$statement{'declaration'}}, $_[2]); }
+    ;
+
+%%

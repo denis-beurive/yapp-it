@@ -1,0 +1,43 @@
+# This parser accepts lines that look like:
+#      ### module::getId
+#      or:
+#      @param name
+#
+# rm -f basic.pm && eyapp -Cv basic.yp 
+
+### -------------------------------------------------
+### Tockens declarations.
+### -------------------------------------------------
+
+%strict
+%whites           = /([ \t]+)/
+%token DOCSTART   = /^(###)/
+%token NAME       = /([a-zA-Z0-9]+)/                    /* Attention à l'ordre des déclaration */
+%token EXTNAME    = /([a-zA-Z0-9_][a-zA-Z0-9\._:]*)/    /* Attention à l'ordre des déclaration */
+%token DESCPARAM  = /\@param/
+
+### -------------------------------------------------
+### Declare the first rule.
+### -------------------------------------------------
+
+%start line
+
+%%
+
+line: 
+        target { print "Got a start of parameter\n" }
+      | param  { print "Got a parameter\n" }
+      ;
+
+target:
+        DOCSTART NAME    { print "Declatation: " . $_[1] . " -> " . $_[2] . "\n"; }
+      | DOCSTART EXTNAME { print "Declatation: " . $_[1] . " -> " . $_[2] . "\n"; }
+      ;
+
+param:
+      DESCPARAM NAME { print "Param: " . $_[1] . " -> " . $_[2] . "\n"; }
+      ;
+
+
+
+%%
