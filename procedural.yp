@@ -1,0 +1,131 @@
+
+
+
+### --------------------------------------------------------------------------------------
+### Header section
+### --------------------------------------------------------------------------------------
+
+# The directive %strict forces the declaration of all tokens.
+# Tokens are the symbols your lexer function will feed your parser with.
+# They are of two flavours of tokens: symbolic tokens and string literals.
+
+%strict
+
+%whites                = /\s+/
+%token OPEN_SIGN       = /(\()/
+%token CLOSE_SIGN      = /(\))/
+%token FUNCTION_NAME   = /(F\d+)/
+%token VAR_NAME        = /(V\d+)/
+%token PARAM_SEPARATOR = /(\,)/
+%token CALL_SEPARATOR  = /\;/
+
+
+
+
+%{
+
+	use lib './lib';
+	use Data::Dumper;
+	use Args;
+	use CallTracker;
+
+	my $args = new Args();
+	my $callTracker = new CallTracker(\&isFunctionName);
+	$Call::isFunctionName = \&isFunctionName;
+
+	sub resetParser {
+		$args->reset();
+		$callTracker->reset();
+	};
+
+	sub isFunctionName {
+		my ($inArg) = @_;
+		if ($inArg =~ m/^F/) { return 1; }
+		return 0;
+	}
+
+	sub explorer {
+		my ($inList) = @_;
+		my @list = ();
+		for (my $i=0; $i<int(@{$inList}); $i++) { push(@list, $inList->[$i]); }
+		return join(', ', @list);
+	}
+
+	sub showStack {
+		my $self = shift;
+	    my ($inIndent) = @_;
+		$callTracker->dump();
+	}
+
+
+	### ----------------------------------------------------------------------------------
+	### 
+	### ----------------------------------------------------------------------------------
+
+	sub processParam {
+		my ($inParam) = @_;
+		$args->add($inParam);
+		return $args->get();
+	}
+
+	sub processCall {
+		my ($inFunction, $inArgs) = @_;
+		$inArgs = defined $inArgs ? $inArgs : [];
+		$callTracker->addCall($inFunction, $inArgs);
+		$args->reset();
+		return $inFunction;
+	}
+
+%}
+
+### --------------------------------------------------------------------------------------
+### Rules section
+###  - To the left of the rule: non-terminal symbols (also called left-hand-side symbols).
+###  - To the right of the rule: terminal symbols (also called tokens).
+### WARNING: terminal symbols (or "tokens") must not appear to the left side of a rule.
+### --------------------------------------------------------------------------------------
+
+%right PARAM_SEPARATOR
+
+%start code
+
+%%
+
+
+param: VAR_NAME 
+     | call     
+     ;
+
+# For expressions that match the following rules, there are _EXACTLY_:
+#  - One "token" (for the first rule)
+#  - Three "tokens" (for the second rule). The three tokens include the separator (",").
+# Please note the this rule is "recurvise": once it has been entered, it will follow until the end.
+# Please note that the last token "appears first".
+# For example: F1(V1,V2,V3)
+#     First:  V3 appears.
+#     Second: V2, V3 appear.
+#     Third:  V1, V2 appear.
+# This behaviour is pretty handy because it allows us to push argument to a fifo.
+# Please note that we loop over this rule as long as we find a complete list of arguments.
+
+param_list: param { return processParam($_[1]); }
+          | param PARAM_SEPARATOR param_list { return processParam($_[1]); }
+          ;
+
+call: FUNCTION_NAME OPEN_SIGN param_list CLOSE_SIGN { return processCall($_[1], $_[3]); } 
+    | FUNCTION_NAME OPEN_SIGN CLOSE_SIGN { return processCall($_[1], []); }
+    ;
+
+code:
+    | call 
+    | call CALL_SEPARATOR code 
+    ;
+
+
+### --------------------------------------------------------------------------------------
+### Footer section
+### --------------------------------------------------------------------------------------
+
+%%
+
+

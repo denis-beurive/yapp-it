@@ -6,7 +6,10 @@ use basic;
 use multiline;
 use comments;
 use declarations;
+use procedural;
+use procedural_debug;
 use Term::ANSIColor;
+use Data::Dumper;
 
 my $DEBUG = 0;
 
@@ -71,6 +74,17 @@ foreach my $input (@{$inputs}) {
 	print "\n";
 }
 
+print "Status: ";
+if (0 == $parser->YYNberr()) {
+	print color 'bold green';
+	print "SUCCESS\n";
+} else {
+	print color 'bold red';
+	print "FAILURE\n";
+}
+print color 'reset';
+print "\n\n";
+
 ### ----------------------------------------
 ### Testing "declarations.yp"
 ### ----------------------------------------
@@ -109,7 +123,16 @@ foreach my $input (@{$inputs}) {
 	print "\n";
 }
 
-
+print "Status: ";
+if (0 == $parser->YYNberr()) {
+	print color 'bold green';
+	print "SUCCESS\n";
+} else {
+	print color 'bold red';
+	print "FAILURE\n";
+}
+print color 'reset';
+print "\n\n";
 
 ### ----------------------------------------
 ### Testing "comments.yp"
@@ -148,6 +171,67 @@ foreach my $input (@{$inputs}) {
 	print color 'reset';
 	print "\n";
 }
+
+print "Status: ";
+if (0 == $parser->YYNberr()) {
+	print color 'bold green';
+	print "SUCCESS\n";
+} else {
+	print color 'bold red';
+	print "FAILURE\n";
+}
+print color 'reset';
+print "\n\n";
+
+### ----------------------------------------
+### Testing "procedural.yp"
+### ----------------------------------------
+
+print "Testing parser procedural.yp\n";
+print "----------------------------\n\n";
+
+$parser = procedural->new();
+$inputs = loadTests('procedural', \$err);
+unless (defined($inputs)) {
+	print STDERR "ERROR: $err\n";
+	exit(1);
+}
+
+foreach my $input (@{$inputs}) {
+	my $n = undef;
+	
+	print "Input:\n";
+	print color 'bold blue';
+	print printInput($input);
+	print color 'reset';
+	print "\n\n";
+	
+	procedural::resetParser();
+	$parser->input($input);
+	$parser->YYParse(%parserConf);
+
+	print "Stack:\n";
+	print color 'bold green';
+	procedural->showStack("	   ");
+	print color 'reset';
+	print "\n\n";
+}
+
+print "Status: ";
+if (0 == $parser->YYNberr()) {
+	print color 'bold green';
+	print "SUCCESS\n";
+} else {
+	print color 'bold red';
+	print "FAILURE\n";
+}
+print color 'reset';
+print "\n\n";
+
+
+
+print "\n\n";
+
 
 
 

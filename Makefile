@@ -23,6 +23,9 @@ ${PARSER_DIR}/declarations.pm: declarations.yp
 	eyapp -Cv -o $@ $<
 	mv declarations.output ${PARSER_DIR}/
 
+${PARSER_DIR}/procedural.pm: procedural.yp
+	eyapp -Cv -o $@ $<
+	mv procedural.output ${PARSER_DIR}/
 
 # --------------------------------------------
 # Generic rules
@@ -31,7 +34,9 @@ ${PARSER_DIR}/declarations.pm: declarations.yp
 all: ${PARSER_DIR}/basic.pm \
      ${PARSER_DIR}/multiline.pm \
      ${PARSER_DIR}/comments.pm \
-     ${PARSER_DIR}/declarations.pm
+     ${PARSER_DIR}/declarations.pm \
+     ${PARSER_DIR}/procedural.pm
+
 
 test: all
 	perl test.pl
