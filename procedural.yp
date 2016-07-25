@@ -11,16 +11,15 @@
 
 %strict
 
-%whites                = /\s+/
-%token OPEN_SIGN       = /(\()/
-%token CLOSE_SIGN      = /(\))/
-%token FUNCTION_NAME   = /(F\d+)/
-%token VAR_NAME        = /(V\d+)/
-%token PARAM_SEPARATOR = /(\,)/
-%token CALL_SEPARATOR  = /\;/
-
-
-
+%whites                 = /\s+/
+%token FUNCTION         = /(F\d+)/
+%token VARIABLE         = /(V\d+)/
+%token STRING           = /((?<!\\)"((?<=\\)"|[^"])*(?<!\\)")/
+%token NUMERIC          = /(\d+(\.\d+)?)/
+%token PARAM_SEPARATOR  = /(\,)/
+%token CALL_SEPARATOR   = /\;/
+%token OPEN_SIGN        = /(\()/
+%token CLOSE_SIGN       = /(\))/
 
 %{
 
@@ -30,33 +29,18 @@
 	use CallTracker;
 
 	my $args = new Args();
-	my $callTracker = new CallTracker(\&isFunctionName);
-	$Call::isFunctionName = \&isFunctionName;
+	my $callTracker = new CallTracker();
 
 	sub resetParser {
 		$args->reset();
 		$callTracker->reset();
 	};
 
-	sub isFunctionName {
-		my ($inArg) = @_;
-		if ($inArg =~ m/^F/) { return 1; }
-		return 0;
-	}
-
-	sub explorer {
-		my ($inList) = @_;
-		my @list = ();
-		for (my $i=0; $i<int(@{$inList}); $i++) { push(@list, $inList->[$i]); }
-		return join(', ', @list);
-	}
-
 	sub showStack {
 		my $self = shift;
 	    my ($inIndent) = @_;
 		$callTracker->dump();
 	}
-
 
 	### ----------------------------------------------------------------------------------
 	### 
@@ -91,9 +75,10 @@
 
 %%
 
-
-param: VAR_NAME 
-     | call     
+param: VARIABLE      { return [$_[1], 'variable']; }
+     | STRING        { return [$_[1], 'string']; }
+     | NUMERIC       { return [$_[1], 'numeric']; }
+     | call          { return [$_[1], 'function']; }
      ;
 
 # For expressions that match the following rules, there are _EXACTLY_:
@@ -107,20 +92,21 @@ param: VAR_NAME
 #     Third:  V1, V2 appear.
 # This behaviour is pretty handy because it allows us to push argument to a fifo.
 # Please note that we loop over this rule as long as we find a complete list of arguments.
+# Please note that the return value of the action rue is very important.
+# The returned value is stored within the parser and it is given as token within subsequent rules (that use "param_list").
 
 param_list: param { return processParam($_[1]); }
           | param PARAM_SEPARATOR param_list { return processParam($_[1]); }
           ;
 
-call: FUNCTION_NAME OPEN_SIGN param_list CLOSE_SIGN { return processCall($_[1], $_[3]); } 
-    | FUNCTION_NAME OPEN_SIGN CLOSE_SIGN { return processCall($_[1], []); }
+call: FUNCTION OPEN_SIGN param_list CLOSE_SIGN { return processCall($_[1], $_[3]); } 
+    | FUNCTION OPEN_SIGN CLOSE_SIGN { return processCall($_[1], []); }
     ;
 
 code:
     | call 
     | call CALL_SEPARATOR code 
     ;
-
 
 ### --------------------------------------------------------------------------------------
 ### Footer section

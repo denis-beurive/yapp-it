@@ -7,10 +7,12 @@ use strict;
 
 use constant TYPE_VARIABLE => 0;
 use constant TYPE_FUNCTION => 1;
+use constant TYPE_NUMERIC  => 2;
+use constant TYPE_STRING   => 3;
+
 
 sub new {
     my $class = shift;
-    my ($inFunctionDetector) = @_;
     my $self = {
         # List the calls in the order they are discovered by the (YAPP) parser.
         # Each element of the list is a reference to "$function->{<function name>}->[]".
@@ -24,9 +26,7 @@ sub new {
         #       or
         #       args => { type => TYPE_FUNCTION, name => <argument name>, index => <number of times the __CALLED__ fonction has been seen within arguments>}
         #       The <number of times the fonction has been seen within arguments> stats at 0.
-        functions => {},
-        # Function call in order to determine whether a name refers to a function or not.
-        functionDetector => $inFunctionDetector
+        functions => {}
     };
 
     bless($self, $class);
@@ -43,7 +43,6 @@ sub reset {
 sub addCall {
     my $self = shift;
     my ($inFunctionName, $inArgs) = @_;
-    my $functionDetector = $self->{functionDetector};
     my @args = ();
 
     # Create an entry in the calls' repository.
@@ -53,12 +52,22 @@ sub addCall {
 
     # Scan the function's arguments.
     foreach my $arg (@{$inArgs}) {
-        if (&$functionDetector($arg)) {
-            push(@args, { type => TYPE_FUNCTION, name => $arg, index => $self->{functions}->{$arg}->{seenInArgs} });
-            $self->{functions}->{$arg}->{seenInArgs} += 1;
+        my $token = $arg->[0];
+        my $type  = $arg->[1];
+
+        if ('function' eq $type) {
+            push(@args, { type => TYPE_FUNCTION, name => $token, index => $self->{functions}->{$token}->{seenInArgs} });
+            $self->{functions}->{$token}->{seenInArgs} += 1;
+        } elsif ('variable' eq $type) {
+            push(@args, { type => TYPE_VARIABLE, name => $token });
+        } elsif ('numeric' eq $type) {
+            push(@args, { type => TYPE_NUMERIC, name => $token });
+        } elsif ('string' eq $type) {
+            push(@args, { type => TYPE_STRING, name => $token });
         } else {
-            push(@args, { type => TYPE_VARIABLE, name => $arg });
+            die("Unexpected type <$type>!");
         }
+
     }
 
     # Add the call into the calls' repository.
@@ -89,17 +98,15 @@ sub traverse {
         my ($inFunctionName, $inArgs) = @_;
     };
 
-
     $inOptProcessVariable = defined $inOptProcessVariable ? $inOptProcessVariable : \&$defaultProcessVariable;
     $inOptProcessFunction = defined $inOptProcessFunction ? $inOptProcessFunction : \&$defaultProcessFunction;
-
-        
 
     # We choose to traverse the siblings from riht to left.
     for (my $i=int(@args)-1; $i>-1; $i--) {
         my $arg = $args[$i];
-        if (TYPE_VARIABLE == $arg->{type}) {
-            # print "  " . $arg->{name} . "\n";
+        if (TYPE_VARIABLE == $arg->{type}  ||
+            TYPE_NUMERIC  == $arg->{type}  ||
+            TYPE_STRING   == $arg->{type}) {
             &$inOptProcessVariable($arg->{name});
             next;
         }
